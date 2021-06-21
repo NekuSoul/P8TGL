@@ -6,6 +6,9 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
 using P8TGL.GameListXml;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 
 namespace P8TGL
 {
@@ -22,6 +25,9 @@ namespace P8TGL
 			var path = args[0];
 			var gamelistPath = Path.Combine(path, "gamelist.xml");
 			var cartPath = Path.Combine(path, "carts");
+			var imagePath = Path.Combine(path, "images");
+
+			Directory.CreateDirectory(imagePath);
 
 			// Read gamelist.xml
 			var serializer = new XmlSerializer(typeof(GameList));
@@ -62,8 +68,9 @@ namespace P8TGL
 			// Update existing entries
 			foreach (var game in list.Games.Where(game => game.Path.EndsWith(".p8.png", StringComparison.InvariantCultureIgnoreCase)))
 			{
+				GenerateThumbnail(Path.Combine(path, game.Path), Path.Combine(imagePath, Path.GetFileName(game.Path)!));
 				game.Name = GetPrettyCartName(Path.GetFileName(game.Path));
-				game.Image = game.Path;
+				game.Image = $@"./images/{Path.GetFileName(game.Path)}";
 			}
 
 			// Write gamelist.xml
@@ -84,9 +91,19 @@ namespace P8TGL
 		private static string GetPrettyCartName(string path)
 		{
 			var fileName = Path.GetFileName(path);
-			var baseName = Regex.Match(fileName,@"(.*?)(\-\d)?\.").Groups[1].Value;
+			var baseName = Regex.Match(fileName, @"(.*?)(\-\d)?\.").Groups[1].Value;
 			var prettyName = baseName.Replace("_", " ").ToUpperInvariant();
 			return prettyName;
+		}
+
+		private static void GenerateThumbnail(string inputPath, string outputPath)
+		{
+			if (File.Exists(outputPath))
+				return;
+
+			var image = Image.Load(File.OpenRead(inputPath));
+			var thumbnail = image.Clone(context => context.Crop(new Rectangle(16, 24, 128, 128)));
+			thumbnail.Save(File.Create(outputPath), PngFormat.Instance);
 		}
 	}
 }
